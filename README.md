@@ -21,7 +21,8 @@
 
 ---
 
-<img src="https://cdn.prod.website-files.com/677c400686e724409a5a7409/6790ad949cf622dc8dcd9fe4_nextwork-logo-leather.svg" alt="NextWork" width="300" />
+<img width="990" height="775" alt="architecture-complete" src="https://github.com/user-attachments/assets/449d2cbb-0b8a-4447-94e8-c3deefa53382" />
+
 
 # Deploy Backend with Kubernetes
 
