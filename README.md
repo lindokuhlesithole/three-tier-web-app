@@ -57,6 +57,9 @@ The application is simple in concept: enter a User ID on a web page, and the app
 
 ## Architecture
 
+<img width="990" height="775" alt="architecture-complete" src="https://github.com/user-attachments/assets/5dedbdec-8ff5-44c7-abdf-371da1bb4200" />
+
+
 ```
 +-----------------------------------------------------------+
 |                      PRESENTATION TIER                     |
