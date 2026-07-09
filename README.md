@@ -21,324 +21,103 @@
 
 ---
 
-## Table of Contents
+<img src="https://cdn.prod.website-files.com/677c400686e724409a5a7409/6790ad949cf622dc8dcd9fe4_nextwork-logo-leather.svg" alt="NextWork" width="300" />
 
-- [Overview](#overview)
-- [Architecture](#architecture)
-- [Presentation Tier | S3 + CloudFront](#presentation-tier--s3--cloudfront)
-- [Application Tier | API Gateway + Lambda](#application-tier--api-gateway--lambda)
-- [Data Tier | DynamoDB](#data-tier--dynamodb)
-- [Integrating the Three Tiers](#integrating-the-three-tiers)
-- [Solving CORS: The Real Challenge](#solving-cors-the-real-challenge)
-- [The Fix](#the-fix)
-- [Result](#result)
-- [Code Samples](#code-samples)
-- [Author](#author)
+# Deploy Backend with Kubernetes
+
+**Project Link:** [View Project](http://nextwork.ai/projects/aws-compute-eks4)
+
+**Author:** Lindokuhle Sithole  
+**Email:** sitholelindokuhle371@gmail.com
 
 ---
 
-## Overview
+## Deploy Backend with Kubernetes
 
-I built a production-quality serverless three-tier web application from scratch on AWS. No EC2 instances to patch at 2 AM, no worrying about traffic spikes, no SSHing into boxes to check logs. Just pure serverless architecture that scales automatically and costs nothing when idle.
-
-The application is simple in concept: enter a User ID on a web page, and the app retrieves that user's data (name, email, role) from a NoSQL database. But the architecture behind it demonstrates real cloud engineering skills that recruiters look for.
-
-### Tech Stack
-
-| Layer | AWS Services | Purpose |
-|-------|-------------|---------|
-| **Presentation** | S3 + CloudFront | Static website hosting with global CDN |
-| **Application** | API Gateway + Lambda | Serverless API with on-demand compute |
-| **Data** | DynamoDB | Fully managed NoSQL database |
-
-**Live Demo:** [https://d13i8ajhi56kbm.cloudfront.net](https://d13i8ajhi56kbm.cloudfront.net)
+![Image](http://nextwork.ai/fulfilled_turquoise_beautiful_bear/uploads/aws-compute-eks4_6cfb382f2)
 
 ---
 
-## Architecture
+## Introducing Today's Project!
 
-<img width="990" height="775" alt="architecture-complete" src="https://github.com/user-attachments/assets/5dedbdec-8ff5-44c7-abdf-371da1bb4200" />
+For this particular project, I am going to launch the backend application using container orchestration on Amazon EKS since I have implemented the whole pipeline of container orchestration in a production-ready manner for scalable deployment.
+The process would include the following steps: provisioning of an EC2 instance, retrieving code from GitHub and creating a Docker image of app and dependencies, uploading the image to Amazon ECR with its versioning. Afterwards, I will be using eksctl to initiate an EKS cluster via CloudFormation for the automatic deployment of the control plane, workers, and networking. Finally, I will define the Deployment, Service and Ingress manifests for Kubernetes, which would run on Amazon EKS using kubectl tool.
+This is all the process of container orchestration.
 
+### Tools and concepts
 
-```
-+-----------------------------------------------------------+
-|                      PRESENTATION TIER                     |
-|                                                            |
-|   +----------------+        +-------------------------+    |
-|   |  S3 Bucket     |  <--   | CloudFront Distribution |    |
-|   | Static Website |        | Global CDN + HTTPS      |    |
-|   | index.html     |        | DDoS Protection         |    |
-|   | styles.css     |        +-------------------------+    |
-|   | script.js      |                                       |
-|   +----------------+                                       |
-+------------------+-----------------------------------------+
-                   | HTTPS / JSON
-                   v
-+------------------+-----------------------------------------+
-|                      APPLICATION TIER                      |
-|                                                            |
-|   +-------------------------+   +---------------------+    |
-|   | API Gateway             |-> | Lambda Function     |    |
-|   | - CORS Handling         |   | - Python / boto3    |    |
-|   | - Request Validation    |   | - IAM Role Access   |    |
-|   | - Rate Limiting         |   | - DynamoDB Query    |    |
-|   +-------------------------+   +---------------------+    |
-+------------------+-----------------------------------------+
-                   | AWS SDK (boto3)
-                   v
-+------------------+-----------------------------------------+
-|                        DATA TIER                           |
-|                                                            |
-|   +----------------------------------------------------+   |
-|   | DynamoDB Table                                      |   |
-|   | - Partition Key: user_id                            |   |
-|   | - NoSQL Key-Value Store                             |   |
-|   | - Auto-Scaling                                      |   |
-|   | - Sub-millisecond latency                           |   |
-|   +----------------------------------------------------+   |
-+------------------------------------------------------------+
-```
+The main software used for this project was eksctl, kubectl, Docker, and the AWS CLI. eksctl deployed my EKS cluster and node groups via CloudFormation. Docker created a container image out of my Flask backend. The AWS CLI was responsible for authentication and kubeconfig updates. kubectl was my control plane console for deploying manifests, checking pods, and controlling the life cycle of Deployment and Service.
+Containerization, orchestration, and declarative infrastructure were the central concepts of this project. I learned that a container image encapsulates everything necessary for its runtime, and the manifests define the desired state that is enforced by the control plane. In addition, I discovered that NodePort Services provide consistent network access despite transient pods, and IAM integration makes it possible for EKS worker nodes to access ECR without managing credentials manually.
 
-**Data Flow:**
-1. User enters a User ID and clicks "Get User Data"
-2. Browser loads the page from CloudFront (nearest edge location)
-3. JavaScript makes an AJAX call to API Gateway
-4. API Gateway routes to Lambda
-5. Lambda queries DynamoDB using the user ID as the partition key
-6. Response flows back: DynamoDB -> Lambda -> API Gateway -> Browser
-7. Frontend displays the user's name, email, and role
+### Project reflection
+
+It took me approximately 5 days to work on this project, and each day was unique in its challenges.
+On the first day, I provisioned the EKS cluster using eksctl and waited for CloudFormation. The second day was about working with Docker: I had to install it, make ec2-user part of the docker group, and finally get my first build done. The third day was ECR — creating the repository, authenticating, and pushing the image. The fourth day was the toughest for me. It was about creating the Deployment and Service YAML files and figuring out why kubectl couldn’t find my cluster till I issued the aws eks update-kubeconfig command. Finally, the fifth day was the celebration when I applied my manifests, watched the pods come up, and tested my NodePort.
+5 days might seem a lot, but I’ve learned more about container orchestration in this week than in a month of tutorials.
 
 ---
 
-## Presentation Tier | S3 + CloudFront
+## Project Set Up
 
-My frontend is hosted on an S3 bucket configured for static website hosting. I upload my HTML, CSS, and JS assets to S3 and serve them via HTTP without running a single server.
+### Kubernetes cluster
 
-CloudFront sits in front of S3 as a global CDN. It caches content at 450+ edge locations worldwide, so users get fast load times wherever they are. It also provides automatic HTTPS, custom domain support, and DDoS protection via AWS Shield.
+My Kubernetes cluster setup was done using eksctl, which uses CloudFormation to manage EKS deployments.
+To start, I used an EC2 instance as my management machine where I setup my tools: eksctl to manage my cluster, kubectl for the Kubernetes API communication, and the AWS CLI for authentication purposes. After configuring my credentials so that eksctl would have access to my AWS account, I executed eksctl create cluster, which deployed everything for me - the EKS control plane, the managed node group of EC2 workers, the VPC, the subnets, security groups, and the IAM roles. 
+After deployment, I checked if there was any connectivity by running kubectl get nodes, thus ensuring that the worker nodes were able to schedule workload.
 
-**Key decisions I made:**
-- Chose CloudFront over the raw S3 website endpoint because S3 only serves over HTTP without CDN benefits. For a production app that recruiters will evaluate, CloudFront looks professional and performs better.
-- Used the CloudFront distribution domain `d1awba178a0c9a.cloudfront.net` as the primary access point.
+### Backend code
 
-> **Result:** No web servers needed, no patching, no scaling issues. Just a frontend that loads fast and looks good.
+The code was gotten by cloning the GitHub repository of my teammate into my build instance.
+I installed Git using sudo dnf install git -y and tested whether it was installed using git --version. My Git credentials were set up to make sure that the environment was good for performing version control operations.
+From there, I navigated to the GitHub repository, got the HTTPS clone URL and used the command git clone in my EC2 terminal to download the nextwork-flask-backend repository. Nextwork-flask-backend is a Python based backend developed using Flask framework by my teammate.
+Upon doing the git clone, I executed the ls command and found out that the directory has been downloaded. After that, I changed the directory and examined all the files.
 
----
+### Container image
 
-## Application Tier | API Gateway + Lambda
+I built a container image because Kubernetes does not run raw source code — it orchestrates containers spawned from images. My Flask backend exists as Python files on my EC2 instance, but EKS needs a self-contained artifact that includes the interpreter, all dependencies from requirements.txt, and the runtime configuration.
+By building the image with Docker, I created a portable blueprint that behaves identically across any environment. Whether Kubernetes schedules it on node one or node fifty, the container starts from the same image and runs the exact same code with the same dependencies. This eliminates the "works on my machine" problem and ensures consistency.
+The image is also what I will push to Amazon ECR, making it accessible to my EKS cluster for pulling and scheduling. Without this container image, my cluster has nothing to deploy.
 
-API Gateway is the entry point for all backend requests. It handles routing, request validation, rate limiting, and API versioning. When the user clicks "Get User Data," JavaScript makes an HTTP request to API Gateway, which routes it to the appropriate Lambda function.
-
-Lambda runs my Python code on-demand. I don't provision servers -- I just write functions, and Lambda automatically scales to match the request volume. One request or a thousand, it handles it without any configuration changes.
-
-The Lambda function uses **boto3** (AWS SDK for Python) to talk to DynamoDB. Authentication is handled entirely by AWS IAM -- no connection strings, no passwords, no secrets to rotate. The Lambda execution role has the necessary DynamoDB permissions, and AWS handles the rest.
-
-**Key implementation detail:**
-- The Lambda extracts the user ID from the API Gateway event parameter (query or path parameters)
-- Calls `dynamodb.get_item()` using the user ID as the partition key
-- Returns a properly formatted HTTP response with the user data as JSON
-- Handles edge cases: non-existent user IDs return a 404, errors return a 500 with proper logging
+The reason why I have pushed the container image to the ECR service is that Kubernetes clusters require a centralized registry where containers can be pulled to run the pods.
+Although the container image was created locally on the EC2, I needed the cluster’s nodes to have access to the specific version of the image on demand. The ECR offers centralized storage services together with its integration into AWS, and since my nodes are authenticated using IAM roles, there is no need for me to worry about credentials management or image copying manually.
+In addition, the ECR also manages the versioning by using image tagging. When I am tagging my container with the latest label, then I will refer to this tag in my Kubernetes deployment. Otherwise, without ECR, I would be required to manually pre-load all of the nodes and make updates independently, which is not practical at all.
+ECR is the key of my pipeline.
 
 ---
 
-## Data Tier | DynamoDB
+## Manifest files
 
-DynamoDB stores all user data -- user IDs, names, emails, roles, and departments. It's a fully managed NoSQL database with no schema requirements. I create a table, specify a partition key (`user_id`), and start storing data.
+The manifest of Kubernetes is a declarative configuration file, normally written in YAML format. It dictates precisely how the Kubernetes cluster should go about deploying the app.
+The desired state is specified by declaring which image to download, how many replicas of a pod to create, exposed ports, resource limits, environment variables, and network specifications. Upon applying a manifest through kubectl command, the control plane of Kubernetes reads it and keeps on working towards reaching the stated desired state. 
+Without manifests, I will be left with the task of manually creating pods and assigning them to nodes and networking each time I want to deploy – an error-prone and impractical process on a large scale.
 
-**Why DynamoDB fits this architecture:**
-- **Integration with Lambda:** My Lambda functions work directly with DynamoDB via IAM roles. No connection pools, no manual scaling.
-- **Auto-scaling:** DynamoDB scales read/write capacity automatically based on load from API Gateway and Lambda.
-- **Performance:** Single-digit millisecond latency on every request.
-- **Cost:** Pay-per-request pricing means I only pay for what I use.
+The Deployment manifest file will provide Kubernetes information regarding how my app should be deployed and scaled.
+It describes the desired state: what container image is supposed to be used (ECR image), number of replicas, their labels, and which ports have to be exposed. Upon applying it to Kubernetes, the cluster control plane will create the corresponding Deployment object that will make sure that the actual state is always aligned with the declared one. In the event that a pod fails, another pod will automatically be created by the Deployment object, and if I update the image version, it will rollout an update.
+In my specific example, it will tell Kubernetes to use nextwork-flask-backend image, create three replicas, and expose port 8080. The Deployment object will take care of the pods creation and distribution among worker nodes without any additional manual effort.
 
----
+Kubernetes Service is a reliable network target that directs traffic to the group of pods.
+Pods are dynamic in nature and constantly being created, killed, and scheduled again by the Deployment, hence their IPs keep changing. To address this problem, the Service provides one consistent IP address and uses labels for redirecting traffic to the right pods. This way, the Service works as a load balancer directing traffic to all healthy replicas without letting the client know to which specific pod it has been redirected.
+In my case, the type of the Service is NodePort, which means that the app becomes available at a certain port in each worker node. Traffic that comes to any NodePort of any node is redirected by the Service to port 8080 in the appropriate pods.
 
-## Integrating the Three Tiers
-
-With each tier built independently, the challenge was making them work together as one cohesive application.
-
-**The integration process:**
-1. Modified the frontend JavaScript to make HTTP requests to the API Gateway endpoint
-2. Configured CORS on API Gateway so the CloudFront-hosted frontend could call it
-3. Ensured the Lambda function has proper IAM permissions for DynamoDB
-4. End-to-end flow: User inputs ID -> JavaScript calls API Gateway -> Lambda queries DynamoDB -> Data returns to the user
-
-**Testing approach:**
-- **API Gateway console:** Sent test requests directly through AWS console to verify the endpoint, Lambda integration, and response formatting -- without touching the frontend.
-- **Postman:** Tested outside the AWS ecosystem with various user IDs, including non-existent ones, to confirm error handling works correctly.
-- **CloudWatch logs:** Reviewed detailed execution processes, timings, and errors for debugging.
+![Image](http://nextwork.ai/fulfilled_turquoise_beautiful_bear/uploads/aws-compute-eks4_b01876554)
 
 ---
 
-## Solving CORS: The Real Challenge
+## Backend Deployment!
 
-This is where I learned the most. Setting up the cloud architecture went quickly -- S3, CloudFront, API Gateway, Lambda, and DynamoDB were all ready within about an hour. The frontend and backend logic took another hour. But then I spent the majority of my time fixing cross-origin issues.
+My backend deployment involved configuring kubectl to access my EKS cluster and deploying my Kubernetes YAML files.
+At first, I installed kubectl on my EC2 machine and set it up as an executable program. Upon running kubectl version, the command was unsuccessful since kubectl could not figure out the location of my cluster – it was searching for localhost:8080 while my cluster resides in AWS.
+The solution entailed running aws eks update-kubeconfig command that created the .kubeconfig file located in ~/.kube/config. This file contains the information about the cluster endpoint, certificate authority, and tokens needed for kubectl to access the EKS API server.
+After getting authenticated and pointing kubectl to my cluster, I executed the kubectl apply -f on my two YAML files – flask-deployment.yaml and flask-service.yaml. It instructed the control plane to create a Deployment and schedule the pods in three copies and activate the NodePort service. My backend is live.
 
-**The problem:** My frontend (hosted on CloudFront at `d1awba178a0c9a.cloudfront.net`) and my API Gateway are on entirely different domains. When JavaScript tried to call the API, the browser blocked it due to CORS policy violations.
+### kubectl
 
-**The most frustrating part:** Everything worked perfectly in Postman, but not in the browser. Postman doesn't enforce CORS -- browsers do. This is a classic trap that every frontend developer hits when building cross-origin APIs.
+The kubectl tool is the CLI for the Kubernetes API and is the primary means of provisioning and managing the resources within a running Kubernetes cluster.
+Whereas eksctl takes care of the management of the EKS cluster itself – setting up and tearing down infrastructure – the kubectl tool is responsible for provisioning resources within the application layer. It is the bridge from my YAML manifests into the API calls to set up Deployments, schedule pods, configure Services, and manage configuration.
+When I use kubectl apply -f, I'm telling the cluster what I want the state of my application to be. Then the Kubernetes controller ensures that it achieves that state – it provisions containers and distributes them among the nodes while ensuring the replica count I specified.
+In summary: eksctl creates the platform. kubectl runs the applications on the platform.
 
-**Root cause analysis revealed a multi-layered issue:**
-
-1. **API Gateway CORS was not configured** -- The API didn't have `Access-Control-Allow-Origin` set to allow requests from my CloudFront domain.
-
-2. **After fixing API Gateway CORS, it still didn't work** -- Because API Gateway changes don't take effect until you create a new deployment. I had enabled CORS in the console but the running deployment still used the old configuration. One click to redeploy, and it started working.
-
-3. **Then the browser rejected Lambda responses** -- Even with API Gateway CORS fixed, the browser checks response headers from the actual Lambda function. If the Lambda doesn't include `Access-Control-Allow-Origin` in its response, the browser ignores the response entirely.
-
-**This CORS setup is double-layered:**
-- **API Gateway** handles the OPTIONS preflight request
-- **Lambda** must include CORS headers in every response (200, 404, and 500)
-- Both layers must be consistent -- one missed path and the browser rejects everything
-
----
-
-## The Fix
-
-**Layer 1 -- API Gateway CORS:**
-- Configured `Access-Control-Allow-Origin` to allow my CloudFront domain (`https://d13i8ajhi56kbm.cloudfront.net`)
-- Added `GET` to `Access-Control-Allow-Methods`
-- **Deployed the API** to a new stage so the CORS configuration took effect
-
-**Layer 2 -- Lambda CORS Headers:**
-- Added `Access-Control-Allow-Origin` to the headers object in **all** return statements
-- Covered every path: 200 for existing users, 404 for non-existing users, 500 for errors
-- Even one missed path would cause the browser to reject responses
-
-**Updated frontend:**
-- Modified `script.js` with the correct API Gateway invoke URL
-- Added JSON parsing to display the returned user data dynamically on the page
-
----
-
-## Result
-
-I opened a browser, navigated to `https://d13i8ajhi56kbm.cloudfront.net`, entered a user ID, and clicked "Get User Data." No CORS errors. No console warnings. Just a clean HTTP 200 response with real user data from DynamoDB flowing across all three tiers.
-
-I tested edge cases -- entered a non-existent user ID to verify error handling, checked CloudWatch logs to confirm the full execution chain. Everything worked.
-
-**Key lesson:** The three hours spent debugging CORS taught me more about cross-origin architecture, API Gateway deployment mechanics, and Lambda response handling than ten hours of smooth sailing ever would. Production systems always have integration challenges between layers, and knowing how to systematically diagnose and fix them is what separates a cloud engineer from someone who just follows tutorials.
-
----
-
-## Code Samples
-
-### Lambda Function (Python)
-
-```python
-import json
-import boto3
-from boto3.dynamodb.conditions import Key
-
-# Initialize outside handler for connection reuse
-dynamodb = boto3.resource('dynamodb')
-table = dynamodb.Table('Users')
-
-def lambda_handler(event, context):
-    # CORS headers must be in EVERY response
-    headers = {
-        'Access-Control-Allow-Origin': 'https://d13i8ajhi56kbm.cloudfront.net',
-        'Access-Control-Allow-Headers': 'Content-Type',
-        'Access-Control-Allow-Methods': 'GET,OPTIONS',
-        'Content-Type': 'application/json'
-    }
-
-    try:
-        # Extract user_id from query parameters
-        user_id = event.get('queryStringParameters', {}).get('user_id')
-
-        if not user_id:
-            return {
-                'statusCode': 400,
-                'headers': headers,
-                'body': json.dumps({'error': 'Missing user_id parameter'})
-            }
-
-        # Query DynamoDB
-        response = table.get_item(Key={'user_id': user_id})
-
-        if 'Item' not in response:
-            return {
-                'statusCode': 404,
-                'headers': headers,
-                'body': json.dumps({'error': f'User not found: {user_id}'})
-            }
-
-        return {
-            'statusCode': 200,
-            'headers': headers,
-            'body': json.dumps(response['Item'], default=str)
-        }
-
-    except Exception as e:
-        return {
-            'statusCode': 500,
-            'headers': headers,
-            'body': json.dumps({'error': str(e)})
-        }
-```
-
-### Frontend JavaScript
-
-```javascript
-const API_URL = 'https://YOUR_API_GATEWAY_URL.execute-api.us-east-1.amazonaws.com/prod';
-
-async function getUserData() {
-    const userId = document.getElementById('userId').value;
-    if (!userId) {
-        alert('Please enter a User ID');
-        return;
-    }
-
-    try {
-        const response = await fetch(`${API_URL}/users?user_id=${userId}`);
-        const data = await response.json();
-
-        if (response.ok) {
-            displayUserData(data);
-        } else {
-            displayError(data.error || 'User not found');
-        }
-    } catch (error) {
-        displayError('Network error: ' + error.message);
-    }
-}
-```
-
-### Frontend HTML
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>User Lookup | Serverless Three-Tier App</title>
-    <link rel="stylesheet" href="styles.css">
-</head>
-<body>
-    <div class="container">
-        <h1>User Lookup Service</h1>
-        <p class="subtitle">Powered by S3 + CloudFront + API Gateway + Lambda + DynamoDB</p>
-
-        <div class="search-box">
-            <label for="userId">Enter User ID:</label>
-            <input type="text" id="userId" placeholder="e.g., user001">
-            <button onclick="getUserData()">Get User Data</button>
-        </div>
-
-        <div id="result" class="result-card hidden">
-            <h2>User Information</h2>
-            <div id="userDetails"></div>
-        </div>
-
-        <div id="error" class="error-card hidden"></div>
-    </div>
-    <script src="script.js"></script>
-</body>
-</html>
-```
-
----
+![Image](http://nextwork.ai/fulfilled_turquoise_beautiful_bear/uploads/aws-compute-eks4_6cfb382f2)
 
 ## Author
 
