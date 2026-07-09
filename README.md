@@ -29,7 +29,6 @@
 
 ---
 
-## Deploy Backend with Kubernetes
 
 ![Image](http://nextwork.ai/fulfilled_turquoise_beautiful_bear/uploads/aws-compute-eks4_6cfb382f2)
 
