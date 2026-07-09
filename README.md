@@ -26,10 +26,6 @@
 
 # Deploy Backend with Kubernetes
 
-**Project Link:** [View Project](http://nextwork.ai/projects/aws-compute-eks4)
-
-**Author:** Lindokuhle Sithole  
-**Email:** sitholelindokuhle371@gmail.com
 
 ---
 
@@ -132,6 +128,3 @@ Based in Bremen, Germany. BSc Mathematical Science from the University of the Wi
 
 ---
 
-<p align="center">
-  <b>Built by <a href="https://www.linkedin.com/in/lindokuhle-sithole-bb701b19a">Lindokuhle Sithole</a> - Cloud Engineer | Cloud DevOps Engineer | Cloud Security Specialist</b>
-</p>
