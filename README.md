@@ -21,15 +21,6 @@
 
 ---
 
-# Build a Three-Tier Web App
-
-**Project Link:** [View Project](http://nextwork.ai/projects/aws-compute-threetier)
-
-**Author:** Lindokuhle Sithole  
-**Email:** sitholelindokuhle371@gmail.com
-
----
-
 ## Build a Three-Tier Web App
 
 ![Image](http://nextwork.ai/fulfilled_turquoise_beautiful_bear/uploads/aws-compute-threetier_2b3c4d5e)
@@ -143,8 +134,6 @@ I came across yet another problem since the CORS issue is still preventing my fr
 Despite all my efforts to fix the CORS problem previously, the browser console is now yelling at me the same message, "No Access-Control-Allow-Origin header is present". The issue here is that my frontend on the domain d13i8ajhi56kbm.cloudfront.net is trying to access my API Gateway, which still doesn't recognize my CloudFront domain.
 Most probably, the root cause of the problem is that I have enabled the CORS setting on my API Gateway console but haven't done a new API Gateway deployment yet. On API Gateway, any changes (such as CORS settings) will not be applied until a new deployment phase is created. That's why the requests that come from my browser are being processed by an old deployment that blocks all cross-origin requests.
 It is rather annoying because it can be solved with just one click in API Gateway.
-
-![Image](http://nextwork.ai/fulfilled_turquoise_beautiful_bear/uploads/aws-compute-threetier_a1b2c3d5)
 
 ---
 
