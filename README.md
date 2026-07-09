@@ -59,16 +59,18 @@
 
 ## Overview
 
-This project is a **production-quality serverless three-tier web application** built entirely on AWS. It demonstrates how to architect, deploy, and operate a modern web application using managed services -- eliminating the need to provision or manage any servers.
+I built this project because I was tired of the "works on my machine" problem. I wanted to build something completely serverless from scratch -- no EC2 instances to patch at 2 AM, no worrying about whether my web server could handle traffic spikes, and no SSHing into boxes just to check a log file.
 
-The application allows users to enter a **User ID** and retrieve associated user data (name, email, etc.) from a fully-managed NoSQL database. It showcases the power of serverless computing, where infrastructure scales automatically with demand and you pay only for what you use.
+This is a production-quality three-tier web application built entirely on AWS using only managed services. The idea is simple: you enter a User ID on a web page, and the app retrieves that user's data (name, email, role, department) from a NoSQL database. But the architecture behind it is where the real learning lives.
 
 ### Why Serverless?
 
+Look, I've been through the traditional route -- provisioning servers, configuring Nginx, patching OS packages, monitoring disk space. It works, but it's a lot of operational overhead for a relatively simple app. With this stack, I get automatic scaling, built-in high availability, and I only pay when someone actually uses the application. No requests? No charges. That's hard to beat.
+
 | Benefit | Description |
 |---------|-------------|
-| **No Server Management** | No OS patching, no capacity planning, no downtime |
-| **Auto-Scaling** | Handles 1 or 1,000,000 concurrent requests automatically |
+| **No Server Management** | No OS patching, no capacity planning, no 3 AM pages |
+| **Auto-Scaling** | Handles 1 request or 1,000,000 without me lifting a finger |
 | **Pay Per Use** | Billed only for actual compute time and API calls |
 | **Global CDN** | Content delivered from 450+ edge locations worldwide |
 | **High Availability** | Built-in multi-AZ redundancy across all services |
@@ -77,7 +79,7 @@ The application allows users to enter a **User ID** and retrieve associated user
 
 ## Architecture
 
-The application follows a classic **three-tier architecture** pattern, implemented entirely with AWS managed services:
+The application follows a classic three-tier pattern. Here's the thing though -- it's implemented entirely with AWS managed services, which means I didn't have to provision a single server:
 
 ```
 +------------------------------------------------------------------+
@@ -121,69 +123,94 @@ The application follows a classic **three-tier architecture** pattern, implement
 
 ### Presentation Tier | S3 + CloudFront
 
-The presentation tier is responsible for delivering the frontend to users with low latency and high availability.
+This is the tier that users actually interact with, and honestly it's the simplest part -- which is the whole point.
 
-- **Amazon S3** hosts the static website files (HTML, CSS, JavaScript). S3's static website hosting feature serves content directly from storage -- no web server required.
-- **Amazon CloudFront** sits in front of S3 as a global Content Delivery Network (CDN). It caches content at 450+ edge locations worldwide, ensuring users get sub-second load times regardless of their geographic location.
-- CloudFront provides **HTTPS encryption**, **custom domain support**, and **DDoS protection** via AWS Shield at no additional cost.
+- **Amazon S3** hosts my static website files (HTML, CSS, JavaScript). S3's static website hosting serves content directly from storage. No web server. No Apache, no Nginx, nothing to configure or patch.
+- **Amazon CloudFront** sits in front of S3 as a global CDN. It caches content at 450+ edge locations, so users get fast load times wherever they are.
+- CloudFront also gives me HTTPS encryption and DDoS protection via AWS Shield at no extra cost.
 - **Live domain:** `d1awba178a0c9a.cloudfront.net`
 
-> **Key Insight:** By hosting static content on S3 and serving via CloudFront, we eliminate the need for web servers entirely. No patching, no scaling concerns, no server maintenance.
+> **My take:** By putting static content on S3 and serving it through CloudFront, I completely eliminated web servers from my architecture. No patching, no scaling concerns, no "server down" nightmares. The frontend loads super fast and looks good. That's it.
 
 ### Application Tier | API Gateway + Lambda
 
-The application tier processes business logic and acts as the bridge between the frontend and the database.
+This is where the business logic lives. It's also where I spent most of my debugging time (more on that in the CORS Deep Dive section).
 
-- **Amazon API Gateway** serves as the secured entry point for all backend requests. It handles routing, request validation, rate limiting, and API versioning.
-- **AWS Lambda** executes Python functions on-demand in response to API Gateway requests. Lambda automatically provisions compute resources, runs the code, and scales to match the request volume -- all without any server management.
-- The Lambda function uses the **AWS SDK for Python (boto3)** to communicate with DynamoDB.
-- **IAM Roles** grant the Lambda function secure access to DynamoDB. There are no connection strings, passwords, or secrets to manage -- authentication is handled entirely by AWS IAM.
+- **Amazon API Gateway** is the entry point for all backend requests. It handles routing, request validation, rate limiting, and API versioning.
+- **AWS Lambda** runs my Python code on-demand. I don't provision servers -- I just write functions. Lambda automatically scales to match the request volume. One request? No problem. A thousand? Still no problem.
+- The Lambda function uses **boto3** (the AWS SDK for Python) to talk to DynamoDB.
+- **IAM Roles** give the Lambda function secure access to DynamoDB. No connection strings, no passwords, no secrets to rotate. Authentication is handled entirely by AWS IAM, and I find that incredibly elegant.
 
 ### Data Tier | DynamoDB
 
-The data tier provides fast, scalable, and reliable data storage.
+The data tier is beautifully simple.
 
-- **Amazon DynamoDB** is a fully managed NoSQL database that stores user data (user IDs, names, emails, and other attributes).
-- DynamoDB **auto-scales** read and write capacity based on application load, ensuring consistent performance at any scale.
-- It delivers **single-digit millisecond latency** at any scale and uses a **pay-per-request** pricing model.
-- Being a NoSQL key-value store, DynamoDB requires no schema definition -- items can have varying attributes.
+- **Amazon DynamoDB** stores all the user data -- user IDs, names, emails, roles, departments. It's a fully managed NoSQL database.
+- DynamoDB auto-scales read and write capacity based on load. I never have to think about provisioning capacity.
+- Single-digit millisecond latency, pay-per-request pricing, and no schema requirements. I just create a table with a partition key and start putting data in it.
 
 ### Architecture Diagram
 
-```mermaid
-graph TB
-    subgraph "Client / User"
-        U[Browser]
-    end
+Here is a complete view of how the three tiers connect and how data flows through the system:
 
-    subgraph "Presentation Tier"
-        CF[CloudFront Distribution<br/>Global CDN + HTTPS<br/>d1awba178a0c9a.cloudfront.net]
-        S3[S3 Bucket<br/>Static Website Hosting<br/>HTML / CSS / JS]
-    end
+```
+                         THREE-TIER ARCHITECTURE
+                        =========================
 
-    subgraph "Application Tier"
-        AG[API Gateway<br/>CORS / Routing / Validation<br/>REST API Endpoint]
-        LAM[Lambda Function<br/>Python 3.11 + boto3<br/>IAM Role Authentication]
-    end
-
-    subgraph "Data Tier"
-        DDB[DynamoDB Table<br/>Partition Key: user_id<br/>NoSQL Key-Value Store]
-    end
-
-    U -->|HTTPS Request| CF
-    CF -->|Origin Fetch| S3
-    U -->|AJAX API Call<br/>GET /users/{id}| AG
-    AG -->|Invoke| LAM
-    LAM -->|boto3.get_item| DDB
-    DDB -->|User Data JSON| LAM
-    LAM -->|JSON Response<br/>200 / 404 / 500| AG
-    AG -->|CORS-enabled Response| U
-
-    style CF fill=#FF9900,stroke=#232F3E,color=#fff
-    style S3 fill=#569A31,stroke=#232F3E,color=#fff
-    style AG fill=#FF4F8B,stroke=#232F3E,color=#fff
-    style LAM fill=#FF9900,stroke=#232F3E,color=#fff
-    style DDB fill=#4053D6,stroke=#232F3E,color=#fff
+     +-----------------------------------------------------------+
+     |                       BROWSER                              |
+     |  User enters a User ID and clicks "Get User Data"         |
+     +--+----------------------------------------------------+-+-+
+        |                                                    |
+        | (1) HTTPS Request: d1awba178a0c9a.cloudfront.net   |
+        |                                                   |
+        v                                                    |
+     +--+-----------------------------------------------+   |
+     |   CLOUDFRONT (Global CDN + HTTPS)                 |   |
+     |   Caches content at 450+ edge locations           |   |
+     +--+-----------------------------------------------+   |
+        |                                                    |
+        | (2) Origin Fetch (cache miss)                      |
+        v                                                    |
+     +--+-----------------------------------------------+   |
+     |   S3 BUCKET (Static Website Hosting)                |   |
+     |   index.html | styles.css | script.js              |   |
+     +----------------------------------------------------+   |
+        |                                                     |
+        |  Page loads. JavaScript now runs in browser.        |
+        |                                                    |
+        | (3) AJAX API Call: GET /users?user_id=user001      |
+        +---------------------------------------------------->|
+                                                             |
+        +-----------------------------------------------------+
+        |
+        v
+     +--+-----------------------------------------------+
+     |   API GATEWAY (REST API Endpoint)                 |
+     |   - Handles CORS preflight (OPTIONS)              |
+     |   - Routes GET /users to Lambda                   |
+     +--+-----------------------------------------------+
+        |
+        | (4) Invoke Lambda Function
+        v
+     +--+-----------------------------------------------+
+     |   LAMBDA FUNCTION (Python 3.11 + boto3)           |
+     |   - Extracts user_id from query params            |
+     |   - Authenticates to DynamoDB via IAM Role        |
+     |   - Returns JSON with CORS headers                |
+     +--+-----------------------------------------------+
+        |
+        | (5) boto3.get_item() call
+        v
+     +--+-----------------------------------------------+
+     |   DYNAMODB TABLE (Users)                          |
+     |   - Partition Key: user_id                        |
+     |   - Returns user record (name, email, role, etc.) |
+     +--+-----------------------------------------------+
+        |
+        | (6) User Data JSON
+        v
+     (back through Lambda, API Gateway, CORS response to Browser)
 ```
 
 ### Data Flow Sequence
@@ -214,29 +241,29 @@ graph TB
 
 ## Demo
 
-The application is live and accessible at:
+The application is live. You can try it right now:
 
 > **https://d1awba178a0c9a.cloudfront.net**
 
 ### How It Works
 
-1. **Load the Application** -- The user navigates to the CloudFront domain. The static website (HTML/CSS/JS) is delivered from the nearest edge location with sub-second latency.
+1. **Load the Application** -- Navigate to the CloudFront URL. The page (HTML/CSS/JS) gets delivered from the nearest edge location, usually in under a second.
 
-2. **Enter a User ID** -- The user types a User ID (e.g., `user001`) into the input field and clicks **"Get User Data"**.
+2. **Enter a User ID** -- Type something like `user001` into the input field and click **"Get User Data"**.
 
-3. **API Request** -- JavaScript running in the browser makes an HTTP GET request to the API Gateway endpoint, passing the User ID as a query parameter.
+3. **API Request** -- JavaScript in the browser makes an HTTP GET request to API Gateway, passing the User ID as a query parameter.
 
-4. **Backend Processing** -- API Gateway routes the request to the Lambda function, which extracts the User ID and queries DynamoDB.
+4. **Backend Processing** -- API Gateway routes the request to Lambda, which extracts the User ID and queries DynamoDB.
 
-5. **Database Lookup** -- DynamoDB performs a key lookup on the partition key (user_id) and returns the matching item.
+5. **Database Lookup** -- DynamoDB does a key lookup on `user_id` and returns the matching record.
 
-6. **Response Rendering** -- Lambda formats the response as JSON and returns it through API Gateway with proper CORS headers. The frontend parses the JSON and dynamically displays the user's name, email, and other data on the page.
+6. **Response Rendering** -- Lambda formats the response as JSON, returns it through API Gateway with CORS headers, and the frontend displays the user's name, email, and other data on the page.
 
 ---
 
 ## Prerequisites
 
-Before deploying this application, you will need the following:
+Before you deploy this, you'll need:
 
 ### Required
 
@@ -699,7 +726,11 @@ echo "Resource ID: $RESOURCE_ID"
 
 ### Step 6: Configure CORS
 
-CORS (Cross-Origin Resource Sharing) is critical because our frontend (served from CloudFront/S3) makes API calls to a different domain (API Gateway). This is a **two-layer configuration** that must be set up in both API Gateway AND the Lambda function.
+Okay, here we go. CORS. I spent probably forever trying to fix cross-origin issues on this project, and I'm going to save you that pain by explaining exactly what I learned the hard way.
+
+CORS is critical because our frontend (served from CloudFront/S3) makes API calls to a different domain (API Gateway). This is a **two-layer configuration** that must be set up in both API Gateway AND the Lambda function. Miss one layer, and the browser blocks everything.
+
+The most frustrating error I hit: everything works in Postman but not in the browser. If you're seeing that, read this section carefully.
 
 #### Layer 1: Configure API Gateway CORS
 
@@ -743,7 +774,7 @@ aws apigateway put-integration-response \
 
 #### Layer 2: Lambda CORS Headers (Already Included)
 
-The Lambda function code in Step 4 already includes CORS headers in ALL return paths. This is essential -- without it, browsers will block the response even if API Gateway CORS is configured.
+The Lambda function code in Step 4 already includes CORS headers in ALL return paths. This is essential -- without it, browsers will block the response even if API Gateway CORS is configured perfectly.
 
 **Key requirement:** Every single return statement in the Lambda must include the `headers` dictionary:
 
@@ -784,7 +815,7 @@ echo "Full endpoint: $API_URL/users?user_id=user001"
 5. Click **"Deploy"**
 6. Note the **Invoke URL** (e.g., `https://abc123def.execute-api.us-east-1.amazonaws.com/prod`)
 
-> **CRITICAL:** After making ANY CORS changes, you MUST redeploy the API for changes to take effect.
+> **CRITICAL:** After making ANY CORS changes, you MUST redeploy the API for changes to take effect. I had to redeploy API Gateway after every CORS change. Every. Single. Time. Don't skip this step.
 
 ---
 
@@ -1395,15 +1426,19 @@ CORS Configuration:
 
 ## CORS Deep Dive
 
-Cross-Origin Resource Sharing (CORS) was the most significant technical challenge in this project. Understanding it deeply is essential for any serverless web application.
+Let me be completely honest with you: CORS was the single most frustrating part of this entire project. I spent what felt like an eternity debugging it. The most annoying thing? Everything worked perfectly in Postman, but the browser would just refuse to cooperate. If you've been there, you know the pain.
+
+Here's what I learned the hard way, so you don't have to.
 
 ### What is CORS?
 
-CORS is a browser security feature that restricts web pages from making requests to a different domain than the one that served the page. When your frontend is served from `d1awba178a0c9a.cloudfront.net` and your API is at `xxx.execute-api.amazonaws.com`, the browser treats this as a **cross-origin request** and blocks it by default.
+CORS (Cross-Origin Resource Sharing) is a browser security feature that stops web pages from making requests to a different domain than the one that served the page. When your frontend is at `d1awba178a0c9a.cloudfront.net` and your API lives at `xxx.execute-api.amazonaws.com`, the browser sees this as a cross-origin request and blocks it unless the server explicitly says it's okay.
+
+Postman doesn't enforce CORS, which is why it works there but fails in the browser. I learned this the hard way after about two hours of confusion.
 
 ### The Two-Layer CORS Solution
 
-This application requires CORS to be configured at **two independent layers**:
+What nobody tells you upfront is that CORS in this architecture has **two independent layers**. You need both to work, or the browser rejects everything:
 
 ```
                     +------------------+
@@ -1432,6 +1467,10 @@ This application requires CORS to be configured at **two independent layers**:
                     |   DynamoDB       |
                     +------------------+
 ```
+
+**Layer 1 (API Gateway):** Handles the OPTIONS preflight request that browsers send automatically before the actual request.
+
+**Layer 2 (Lambda):** Must include CORS headers in every single response it returns -- success, error, and not-found. If you miss even one return path, the browser blocks it.
 
 ### Layer 1: API Gateway CORS
 
@@ -1566,41 +1605,43 @@ curl -X GET \
 
 ## Lessons Learned
 
-### 1. Serverless Changes How You Think About Architecture
+### 1. Serverless Really Does Change How You Think
 
-Traditional architectures require planning for peak capacity. With serverless, the constraint shifts from "how many servers do I need?" to "how do I design stateless, event-driven functions?" The mental model changes from managing infrastructure to composing services.
+Coming from a traditional background where you're always thinking "how many servers do I need?" and "what instance size should I use?", shifting to serverless feels weird at first. The mental model changes from managing infrastructure to composing services. Instead of SSHing into a box to debug, you're reading CloudWatch logs. It's different, but once it clicks, you don't want to go back.
 
-### 2. CORS is a Two-Layer Problem
+### 2. CORS Will Humble You
 
-The biggest challenge in this project was CORS configuration. I initially configured API Gateway CORS but forgot to add CORS headers to all Lambda return paths. The application worked for successful queries but failed silently for "user not found" scenarios because the browser blocked the 404 response. The lesson: **CORS must be handled consistently at every layer.**
+I cannot stress this enough. CORS has two layers -- API Gateway handles the OPTIONS preflight, but Lambda needs the response headers too. Miss one path and the browser rejects everything. I spent probably three hours debugging CORS issues. The most frustrating error: everything works in Postman but not in the browser. The three hours spent fixing everything were way more educational than ten hours of smooth sailing would have been.
 
 ### 3. IAM is the Security Model
 
-In serverless architectures, IAM roles replace connection strings, API keys, and secrets. The Lambda function authenticates to DynamoDB through its IAM role -- no passwords, no certificates to manage. This is more secure by design but requires understanding IAM policies thoroughly.
+In serverless architectures, IAM roles replace connection strings, API keys, and secrets. My Lambda function authenticates to DynamoDB through its IAM role -- no passwords, no certificates to manage. This is more secure by design, but you need to understand IAM policies. When something fails with an access error, check IAM first.
 
 ### 4. CloudFront Cache Invalidation is Easy to Forget
 
-After updating the frontend JavaScript to point to the new API Gateway URL, the changes didn't appear immediately. CloudFront was serving the cached version. The lesson: **always invalidate the CloudFront cache after deploying frontend changes**, or use versioned filenames for cache-busting.
+After updating the frontend JavaScript to point to the new API Gateway URL, the changes didn't show up. I spent 20 minutes wondering what I broke before I realized CloudFront was serving the cached version. Always invalidate the CloudFront cache after deploying frontend changes. I put a note about this in my deployment checklist now.
 
 ### 5. Test Each Layer Independently
 
-Debugging is easier when you test each tier separately:
+When something breaks in a distributed system, it can be anywhere. I learned to test each tier separately:
 - Test DynamoDB directly (AWS Console or CLI)
 - Test Lambda directly (test events in Console)
-- Test API Gateway (test functionality + external tools)
+- Test API Gateway (test functionality + external tools like curl)
 - Test the full stack (browser on CloudFront domain)
+
+Debugging is way faster when you isolate which tier has the problem.
 
 ### 6. CloudWatch is Your Best Friend
 
-When something goes wrong in a serverless stack, CloudWatch Logs are the primary debugging tool. The Lambda function prints all errors to CloudWatch, and API Gateway execution logs show the full request/response cycle. Enable detailed logging early.
+When something goes wrong in a serverless stack, CloudWatch Logs are where you find answers. My Lambda prints all errors to CloudWatch, and API Gateway execution logs show the full request/response cycle. Enable detailed logging early. I can't count how many times a quick look at CloudWatch saved me hours of guessing.
 
-### 7. Infrastructure as Code is Worth the Investment
+### 7. Infrastructure as Code is the Way to Go
 
-While this project was built through the AWS Console and CLI, doing it again I would use AWS CloudFormation or Terraform. Manual configuration is error-prone and hard to reproduce. Documenting the CLI commands (as done in this README) is a good intermediate step.
+I built this project using the AWS Console and CLI, which was great for learning. But if I were doing it again for production, I'd use CloudFormation or Terraform. Manual configuration is error-prone and hard to reproduce. Writing down the CLI commands in this README helped, but IaC is the real answer.
 
 ### 8. The AWS Free Tier is Generous
 
-This entire application can run on the AWS Free Tier for 12 months. Even after the free tier, the cost for low-traffic applications is typically under $1/month. Serverless is genuinely cost-effective for small to medium workloads.
+This entire application runs on the AWS Free Tier for 12 months. Even after the free tier, the cost for low-traffic applications is typically under $1/month. Serverless is genuinely cost-effective for small to medium workloads. The time when user data finally showed up in my CloudFront application was absolutely rewarding.
 
 ---
 
@@ -1609,6 +1650,8 @@ This entire application can run on the AWS Free Tier for 12 months. Even after t
 ### CORS Errors
 
 **Symptom:** Browser console shows `Access to fetch at '...' from origin '...' has been blocked by CORS policy`
+
+Trust me, I've been here. Here's how to fix it:
 
 **Diagnosis Steps:**
 1. Check if the OPTIONS preflight request succeeds (Network tab in DevTools)
@@ -1773,7 +1816,7 @@ This project is licensed under the MIT License.
 ```
 MIT License
 
-Copyright (c) 2024 Lindokuhle Sithole — Cloud Engineer | Cloud DevOps Engineer | Cloud Security Specialist
+Copyright (c) 2024 Lindokuhle Sithole -- Cloud Engineer | Cloud DevOps Engineer | Cloud Security Specialist
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -1798,16 +1841,16 @@ SOFTWARE.
 
 ## Author
 
-**Lindokuhle Sithole — Cloud Engineer | Cloud DevOps Engineer | Cloud Security Specialist**
+**Lindokuhle Sithole -- Cloud Engineer | Cloud DevOps Engineer | Cloud Security Specialist**
 
 > **Location:** Bremen, Germany  
 > Building production-grade cloud infrastructure and serverless applications on AWS.
 
 ### About
 
-Cloud Engineer based in Bremen, Germany, specializing in architecting, deploying, and securing scalable solutions on Amazon Web Services. With a strong foundation in Mathematical Science and multiple AWS certifications, I bring a data-driven, security-first approach to cloud engineering and DevOps practices.
+I'm a Cloud Engineer based in Bremen, Germany. I come from a Mathematical Science background (BSc from Wits), and I hold multiple AWS certifications including Solutions Architect Professional and Security Specialty. I specialize in architecting, deploying, and securing scalable solutions on AWS.
 
-This project was built as a hands-on demonstration of production-quality serverless architecture on AWS — showcasing how managed services can be composed to build scalable, cost-effective web applications without managing servers.
+This project was built as a hands-on demonstration of production-quality serverless architecture. I wanted to prove to myself that I could build a complete, working three-tier application without managing a single server. The CORS debugging nearly broke me, but when user data finally showed up in my CloudFront application, it was absolutely worth it. The three hours I spent fixing everything were way more educational than ten hours without any issues would have been.
 
 ### Connect
 
@@ -1846,12 +1889,12 @@ This project was built as a hands-on demonstration of production-quality serverl
 ### Education
 
 **University of the Witwatersrand**  
-Bachelor of Science (BS) — Mathematical Science
+Bachelor of Science (BS) -- Mathematical Science
 
 ---
 
 <p align="center">
-  Built with <span style="color: #ff9900;">&#9733;</span> on AWS
+  Built with care on AWS
 </p>
 
 <p align="center">
