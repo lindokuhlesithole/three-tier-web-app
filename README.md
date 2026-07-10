@@ -23,6 +23,9 @@
 
 ## Build a Three-Tier Web App
 
+<img width="990" height="775" alt="architecture-complete" src="https://github.com/user-attachments/assets/622abee6-b203-47bb-8e78-cd538d3fdb84" />
+
+
 ![Image](http://nextwork.ai/fulfilled_turquoise_beautiful_bear/uploads/aws-compute-threetier_2b3c4d5e)
 
 ---
