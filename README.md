@@ -1,24 +1,5 @@
 <h1 align="center">Three-Tier Web Application on AWS</h1>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/AWS-S3-569A31?style=for-the-badge&logo=amazons3&logoColor=white" alt="S3" />
-  <img src="https://img.shields.io/badge/AWS-CloudFront-232F3E?style=for-the-badge&logo=amazonaws&logoColor=white" alt="CloudFront" />
-  <img src="https://img.shields.io/badge/AWS-API%20Gateway-FF4F8B?style=for-the-badge&logo=amazonaws&logoColor=white" alt="API Gateway" />
-  <img src="https://img.shields.io/badge/AWS-Lambda-FF9900?style=for-the-badge&logo=awslambda&logoColor=white" alt="Lambda" />
-  <img src="https://img.shields.io/badge/AWS-DynamoDB-4053D6?style=for-the-badge&logo=amazondynamodb&logoColor=white" alt="DynamoDB" />
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/serverless-architecture-brightgreen?style=flat-square" alt="Serverless" />
-  <img src="https://img.shields.io/badge/python-3.11-blue?style=flat-square&logo=python" alt="Python" />
-  <img src="https://img.shields.io/badge/status-production-success?style=flat-square" alt="Status" />
-</p>
-
-<p align="center">
-  <img src="https://img.shields.io/badge/AWS-Solutions%20Architect%20Professional-FF9900?style=for-the-badge&logo=amazonaws&logoColor=white" alt="AWS SA Pro" />
-  <img src="https://img.shields.io/badge/AWS-Security%20Specialty-232F3E?style=for-the-badge&logo=amazonaws&logoColor=FF9900" alt="AWS Security" />
-</p>
-
 ---
 
 ## Build a Three-Tier Web App
